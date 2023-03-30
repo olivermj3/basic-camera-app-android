@@ -49,6 +49,60 @@ public class CameraCapture {
     private int frameCount;
     private boolean capturing;
 
+    // declare the camera capture session variable
+    private CameraCaptureSession cameraCaptureSession;
+    private CaptureRequest.Builder previewRequestBuilder;
+
+    private final CameraCaptureSession.StateCallback captureSessionStateCallback =
+            new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(@NonNull CameraCaptureSession session) {
+                    try {
+                        CaptureRequest previewRequest = previewRequestBuilder.build();
+                        cameraCaptureSession = session;
+                        session.setRepeatingRequest(previewRequest, null, null);
+                    } catch (CameraAccessException e) {
+                        Log.e(TAG, "Error setting up preview", e);
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                    Log.e(TAG, "Failed to configure the camera");
+                }
+            };
+
+    private final CameraDevice.StateCallback cameraDeviceStateCallback =
+            new CameraDevice.StateCallback() {
+                @Override
+                public void onOpened(@NonNull CameraDevice camera) {
+                    cameraDevice = camera;
+                    try {
+                        previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                        previewRequestBuilder.addTarget(surface);
+                        CaptureRequest previewRequest = previewRequestBuilder.build();
+                        cameraDevice.createCaptureSession(Arrays.asList(surface, imageReader.getSurface()),
+                                captureSessionStateCallback, null);
+                    } catch (CameraAccessException e) {
+                        Log.e(TAG, "Error setting up camera preview", e);
+                    }
+                }
+
+                @Override
+                public void onDisconnected(@NonNull CameraDevice camera) {
+                    camera.close();
+                    cameraDevice = null;
+                    Log.e(TAG, "Camera device was disconnected");
+                }
+
+                @Override
+                public void onError(@NonNull CameraDevice camera, int error) {
+                    camera.close();
+                    cameraDevice = null;
+                    Log.e(TAG, "Camera device error: " + error);
+                }
+            };
+
     public void startCapture(Context context, Executor executor) {
         this.context = context;
         this.executor = executor;
@@ -56,9 +110,15 @@ public class CameraCapture {
         surfaceTexture = new SurfaceTexture(/*randomTexture=*/ 0, /*unused=*/ false);
         surfaceTexture.setDefaultBufferSize(/*width=*/ 640, /*height=*/ 480);
         surface = new Surface(surfaceTexture);
-        imageReader = ImageReader.newInstance(/*width=*/ 640, /*height=*/ 480, /*format=*/ ImageFormat.YUV_420_888, /*maxImages=*/ 100);
+        imageReader = ImageReader.newInstance(/*width=*/ 640, /*height=*/ 480, /*format=*/ ImageFormat.YUV_420_888, /*maxImages=*/ 10);
         imageReader.setOnImageAvailableListener(this::onImageAvailable, new Handler(Looper.getMainLooper()));
-
+        try {
+            CameraManager cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
+            String cameraId = cameraManager.getCameraIdList()[0];
+            cameraManager.openCamera(cameraId, cameraDeviceStateCallback, null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
         try {
             CameraManager cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
             String cameraId = cameraManager.getCameraIdList()[0];
@@ -113,8 +173,20 @@ public class CameraCapture {
     }
     public void stopCapture() {
         if (cameraDevice != null) {
-            cameraDevice.close();
-            cameraDevice = null;
+            try {
+                if (cameraCaptureSession != null) {
+                    // add a state callback to check if the camera capture session is still active
+                    cameraCaptureSession.stopRepeating();
+                    cameraCaptureSession.abortCaptures();
+                    cameraCaptureSession.close();
+                    cameraCaptureSession = null;
+                }
+                cameraDevice.close();
+                cameraDevice = null;
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
+            }
         }
     }
+
 }

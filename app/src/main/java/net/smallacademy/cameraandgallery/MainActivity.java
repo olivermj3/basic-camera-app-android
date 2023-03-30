@@ -1,34 +1,14 @@
-package net.smallacademy.cameraandgallery;// MainActivity.java
+package net.smallacademy.cameraandgallery;
 
+import android.Manifest;
 import android.app.Activity;
-import android.os.Bundle;
-import android.util.Size;
-import androidx.camera.core.CameraSelector;
-import androidx.camera.core.ImageAnalysis;
-import androidx.camera.core.ImageProxy;
-import androidx.camera.core.Preview;
-import androidx.camera.lifecycle.ProcessCameraProvider;
-import androidx.core.content.ContextCompat;
-import androidx.lifecycle.LifecycleOwner;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.mediapipe.framework.AndroidPacketGetter;
-import com.google.mediapipe.framework.Packet;
-import com.google.mediapipe.framework.PacketGetter;
-import com.google.mediapipe.framework.TextureFrame;
-import com.google.mediapipe.glutil.EglManager;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-
-import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.View;
+import android.widget.Button;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -38,12 +18,40 @@ public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private CameraCapture cameraCapture;
     private Executor executor = Executors.newSingleThreadExecutor();
+    private static final int CAMERA_PERMISSION_REQUEST_CODE = 100;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Set the activity layout
         setContentView(R.layout.activity_main);
 
+        // Check for camera permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
+            } else {
+                startCamera();
+            }
+        } else {
+            startCamera();
+        }
+
+        // Find the camera button in the layout
+        Button cameraBtn = findViewById(R.id.cameraBtn);
+
+        // Set a click listener for the camera button
+        cameraBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Call the startCamera() method when the camera button is pressed
+                startCamera();
+            }
+        });
+    }
+
+    private void startCamera() {
         // Create a new instance of CameraCapture and start capturing images
         cameraCapture = new CameraCapture();
         cameraCapture.startCapture(this, executor);
@@ -55,5 +63,17 @@ public class MainActivity extends Activity {
                 cameraCapture.stopCapture();
             }
         }, 3000);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startCamera();
+            } else {
+                // Handle denied camera permission
+            }
+        }
     }
 }
