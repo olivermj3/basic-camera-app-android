@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
             public void run() {
                 cameraCapture.stopCapture();
             }
-        }, 3000);
+        }, 3000); // this is the 3 second variable
     }
 
     @Override

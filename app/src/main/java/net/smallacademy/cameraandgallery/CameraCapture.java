@@ -49,7 +49,7 @@ public class CameraCapture {
     private int frameCount;
     private boolean capturing;
 
-    // declare the camera capture session variable
+
     private CameraCaptureSession cameraCaptureSession;
     private CaptureRequest.Builder previewRequestBuilder;
 
@@ -169,7 +169,7 @@ public class CameraCapture {
     }
 
     private void onImageAvailable(ImageReader reader) {
-        // You can handle the available image here, e.g., for further processing or saving.
+        // This is a placeholder for further processing and saving.
     }
     public void stopCapture() {
         if (cameraDevice != null) {
