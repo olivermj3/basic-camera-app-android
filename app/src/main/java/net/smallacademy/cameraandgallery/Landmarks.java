@@ -2,19 +2,54 @@
 package net.smallacademy.cameraandgallery;
 
 import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.provider.MediaStore;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.exifinterface.media.ExifInterface;
+// ContentResolver dependency
+import com.google.mediapipe.formats.proto.LandmarkProto.NormalizedLandmark;
+import com.google.mediapipe.solutioncore.CameraInput;
+import com.google.mediapipe.solutioncore.SolutionGlSurfaceView;
+import com.google.mediapipe.solutioncore.VideoInput;
+import com.google.mediapipe.solutions.facemesh.FaceMesh;
+import com.google.mediapipe.solutions.facemesh.FaceMeshOptions;
+import com.google.mediapipe.solutions.facemesh.FaceMeshResult;
+import java.io.IOException;
+import java.io.InputStream;
 
-import org.opencv.android.Utils;
+// opencv imports
+import java.lang.reflect.Field;
+import com.google.mediapipe.solutioncore.ImageSolutionResult;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint;
+import org.opencv.android.Utils;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.imgproc.Imgproc;
 import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
-import org.opencv.core.Scalar;
-import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,10 +57,62 @@ public class Landmarks {
     private static final String TAG = "Landmarks";
 
     public void processImage(Bitmap bitmap) {
-        // Process the Bitmap image data here
-        // ...
+        private Bitmap rotateBitmap(Bitmap inputBitmap, InputStream imageData) throws IOException {
+            int orientation =
+                    new ExifInterface(imageData)
+                            .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+            if (orientation == ExifInterface.ORIENTATION_NORMAL) {
+                return inputBitmap;
+            }
+            Matrix matrix = new Matrix();
+            switch (orientation) {
+                case ExifInterface.ORIENTATION_ROTATE_90:
+                    matrix.postRotate(90);
+                    break;
+                case ExifInterface.ORIENTATION_ROTATE_180:
+                    matrix.postRotate(180);
+                    break;
+                case ExifInterface.ORIENTATION_ROTATE_270:
+                    matrix.postRotate(270);
+                    break;
+                default:
+                    matrix.postRotate(0);
+            }
+            return Bitmap.createBitmap(
+                    inputBitmap, 0, 0, inputBitmap.getWidth(), inputBitmap.getHeight(), matrix, true);
+        }
     }
+    private void setupStaticImageModePipeline() {
+        this.inputSource = InputSource.IMAGE;
+        // Initializes a new MediaPipe Face Mesh solution instance in the static image mode.
+        facemesh =
+                new FaceMesh(
+                        this,
+                        FaceMeshOptions.builder()
+                                .setStaticImageMode(true)
+                                .setRefineLandmarks(true)
+                                .setRunOnGpu(RUN_ON_GPU)
+                                .build());
 
+        // Connects MediaPipe Face Mesh solution to the user-defined FaceMeshResultImageView.
+//    Mat dummy_image = Mat.zeros(faceMeshResult.inputBitmap().getHeight(),
+//            faceMeshResult.inputBitmap().getWidth(),
+//            CvType.CV_8UC1);
+        facemesh.setResultListener(
+                faceMeshResult -> {
+                    logNoseLandmark(faceMeshResult, /*showPixelValues=*/ true);
+                    imageView.setFaceMeshResult(faceMeshResult);
+                    runOnUiThread(() -> imageView.update());
+                });
+        facemesh.setErrorListener((message, e) -> Log.e(TAG, "MediaPipe Face Mesh error:" + message));
+
+        // Updates the preview layout.
+        FrameLayout frameLayout = findViewById(R.id.preview_display_layout);
+        frameLayout.removeAllViewsInLayout();
+        imageView.setImageDrawable(null);
+        frameLayout.addView(imageView);
+        imageView.setVisibility(View.VISIBLE);
+    }
     // Jim Code
     private List<Double> average_ROI(Mat input_image, List<Point> points_of_interest) {
         //    Mat image = /* Your input image */;
@@ -82,7 +169,6 @@ public class Landmarks {
         }
         return slicedPoints;
     }
-
     private void logNoseLandmark(FaceMeshResult result, boolean showPixelValues) {
         if (result == null || result.multiFaceLandmarks().isEmpty()) {
             return;
