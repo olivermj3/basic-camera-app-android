@@ -48,10 +48,9 @@ public class CameraCapture {
     private ImageReader imageReader;
     private int frameCount;
     private boolean capturing;
-
-
     private CameraCaptureSession cameraCaptureSession;
     private CaptureRequest.Builder previewRequestBuilder;
+    private Processing processing;
 
     private final CameraCaptureSession.StateCallback captureSessionStateCallback =
             new CameraCaptureSession.StateCallback() {
@@ -169,7 +168,18 @@ public class CameraCapture {
     }
 
     private void onImageAvailable(ImageReader reader) {
-        // This is a placeholder for further processing and saving.
+        Image image = reader.acquireNextImage();
+        if (image != null) {
+            Image.Plane[] planes = image.getPlanes();
+            if (planes.length == 3) {
+                ByteBuffer yBuffer = planes[0].getBuffer();
+                ByteBuffer uBuffer = planes[1].getBuffer();
+                ByteBuffer vBuffer = planes[2].getBuffer();
+                processing = new Processing();
+                processing.processImage(yBuffer, uBuffer, vBuffer); // call processing method
+            }
+            image.close();
+        }
     }
     public void stopCapture() {
         if (cameraDevice != null) {
