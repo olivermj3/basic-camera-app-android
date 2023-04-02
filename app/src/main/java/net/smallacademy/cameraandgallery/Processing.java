@@ -28,12 +28,14 @@ public class Processing {
     private Packet uPacket;
     private Packet vPacket;
     private ExecutorService executorService;
+    private Landmarks landmarks;
 
     public void init() {
         graph = new Graph();
         eglManager = new EglManager(null);
         eglBase = EglBase.create();
         executorService = Executors.newSingleThreadExecutor();
+        landmarks = new Landmarks();
 
         // Set up input and output streams
         graph.addPacketCallback("y", (packet) -> {
@@ -53,6 +55,9 @@ public class Processing {
 
                 // Convert the texture frame to a Bitmap
                 Bitmap bitmap = textureFrameToBitmap(outputTextureFrame);
+
+                // Send the Bitmap to the Landmarks class
+                landmarks.processBitmap(bitmap);
 
                 // Process the Bitmap image data here
             });
