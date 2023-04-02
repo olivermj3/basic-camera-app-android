@@ -56,9 +56,6 @@ public class Processing {
                 // Convert the texture frame to a Bitmap
                 Bitmap bitmap = textureFrameToBitmap(outputTextureFrame);
 
-                // Send the Bitmap to the Landmarks class
-                landmarks.processBitmap(bitmap);
-
                 // Process the Bitmap image data here
             });
         });
@@ -126,6 +123,8 @@ public class Processing {
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         pixelBuffer.rewind();
         bitmap.copyPixelsFromBuffer(pixelBuffer);
+
+        landmarks.processImage(bitmap);
 
         return bitmap;
     }
