@@ -21,65 +21,75 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.Executor;
 
-public class CameraCapture {
-    private static final String TAG = "CameraCapture";
-    private Context context;
-    private Executor executor;
-    private SurfaceTexture surfaceTexture;
-    private Surface surface;
-    private CameraDevice cameraDevice;
-    private ImageReader imageReader;
-    private CameraCaptureSession cameraCaptureSession;
-    private CaptureRequest.Builder previewRequestBuilder;
+    public class CameraCapture {
+        private static final String TAG = "CameraCapture";
+        private Context context;
+        private Executor executor;
+        private SurfaceTexture surfaceTexture;
+        private Surface surface;
+        private CameraDevice cameraDevice;
+        private ImageReader imageReader;
+        private CameraCaptureSession cameraCaptureSession;
+        private CaptureRequest.Builder previewRequestBuilder;
 
-    private final CameraCaptureSession.StateCallback captureSessionStateCallback =
-            new CameraCaptureSession.StateCallback() {
-                @Override
-                public void onConfigured(@NonNull CameraCaptureSession session) {
-                    try {
-                        CaptureRequest previewRequest = previewRequestBuilder.build();
-                        cameraCaptureSession = session;
-                        session.setRepeatingRequest(previewRequest, null, null);
-                    } catch (CameraAccessException e) {
-                        Log.e(TAG, "Error setting up preview", e);
+        private static final int MAX_IMAGES = 30;
+
+        private static final int MAX_IMAGES_PER_SECOND = 10;
+
+        private static final int CAPTURE_DURATION_SECONDS = 3;
+
+
+        private final CameraDevice.StateCallback cameraDeviceStateCallback = new CameraDevice.StateCallback() {
+            @Override
+            public void onOpened(@NonNull CameraDevice camera) {
+                cameraDevice = camera;
+                try {
+                    previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                    previewRequestBuilder.addTarget(surface);
+                    previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
+                    previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
+                    cameraDevice.createCaptureSession(Arrays.asList(surface, imageReader.getSurface()),
+                            captureSessionStateCallback, null);
+                } catch (CameraAccessException e) {
+                    Log.e(TAG, "Error setting up camera preview", e);
+                }
+            }
+
+
+            @Override
+            public void onDisconnected(@NonNull CameraDevice camera) {
+                camera.close();
+                cameraDevice = null;
+                Log.e(TAG, "Camera device was disconnected");
+            }
+
+            @Override
+            public void onError(@NonNull CameraDevice camera, int error) {
+                camera.close();
+                cameraDevice = null;
+                Log.e(TAG, "Camera device error: " + error);
+            }
+        };
+
+        private final CameraCaptureSession.StateCallback captureSessionStateCallback =
+                new CameraCaptureSession.StateCallback() {
+                    @Override
+                    public void onConfigured(@NonNull CameraCaptureSession session) {
+                        try {
+                            CaptureRequest previewRequest = previewRequestBuilder.build();
+                            cameraCaptureSession = session;
+                            session.setRepeatingRequest(previewRequest, null, null);
+                        } catch (CameraAccessException e) {
+                            Log.e(TAG, "Error setting up preview", e);
+                        }
                     }
-                }
 
-                @Override
-                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-                    Log.e(TAG, "Failed to configure the camera");
-                }
-            };
-
-    private final CameraDevice.StateCallback cameraDeviceStateCallback =
-            new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(@NonNull CameraDevice camera) {
-                    cameraDevice = camera;
-                    try {
-                        previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-                        previewRequestBuilder.addTarget(surface);
-                        cameraDevice.createCaptureSession(Arrays.asList(surface, imageReader.getSurface()),
-                                captureSessionStateCallback, null);
-                    } catch (CameraAccessException e) {
-                        Log.e(TAG, "Error setting up camera preview", e);
+                    @Override
+                    public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                        Log.e(TAG, "Failed to configure the camera");
                     }
-                }
+                };
 
-                @Override
-                public void onDisconnected(@NonNull CameraDevice camera) {
-                    camera.close();
-                    cameraDevice = null;
-                    Log.e(TAG, "Camera device was disconnected");
-                }
-
-                @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
-                    camera.close();
-                    cameraDevice = null;
-                    Log.e(TAG, "Camera device error: " + error);
-                }
-            };
 
     public void startCapture(Context context, Executor executor) {
         this.context = context;
@@ -87,7 +97,7 @@ public class CameraCapture {
         surfaceTexture = new SurfaceTexture(/*randomTexture=*/ 0, /*unused=*/ false);
         surfaceTexture.setDefaultBufferSize(/*width=*/ 640, /*height=*/ 480);
         surface = new Surface(surfaceTexture);
-        imageReader = ImageReader.newInstance(/*width=*/ 640, /*height=*/ 480, /*format=*/ ImageFormat.YUV_420_888, /*maxImages=*/ 10);
+        imageReader = ImageReader.newInstance(/*width=*/ 640, /*height=*/ 480, /*format=*/ ImageFormat.YUV_420_888, /*maxImages=*/ MAX_IMAGES);
         imageReader.setOnImageAvailableListener(this::onImageAvailable, new Handler(Looper.getMainLooper()));
         try {
             CameraManager cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
@@ -96,9 +106,8 @@ public class CameraCapture {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
-        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
-        previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
     }
+
 
     private void onImageAvailable(ImageReader reader) {
         Image image = reader.acquireNextImage();
@@ -130,6 +139,7 @@ public class CameraCapture {
         if (cameraDevice != null) {
             try {
                 if (cameraCaptureSession != null) {
+                    // Stop repeating request for collecting frames
                     cameraCaptureSession.stopRepeating();
                     cameraCaptureSession.abortCaptures();
                     cameraCaptureSession.close();
@@ -146,4 +156,5 @@ public class CameraCapture {
             imageReader = null;
         }
     }
+
 }
