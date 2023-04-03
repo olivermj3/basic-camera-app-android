@@ -37,6 +37,7 @@ import java.util.concurrent.Executor;
         private static final int MAX_IMAGES_PER_SECOND = 10;
 
         private static final int CAPTURE_DURATION_SECONDS = 3;
+        private int numFramesCaptured = 0; // Add this instance variable
 
 
         private final CameraDevice.StateCallback cameraDeviceStateCallback = new CameraDevice.StateCallback() {
@@ -99,6 +100,7 @@ import java.util.concurrent.Executor;
         surface = new Surface(surfaceTexture);
         imageReader = ImageReader.newInstance(/*width=*/ 640, /*height=*/ 480, /*format=*/ ImageFormat.YUV_420_888, /*maxImages=*/ MAX_IMAGES);
         imageReader.setOnImageAvailableListener(this::onImageAvailable, new Handler(Looper.getMainLooper()));
+        Log.d(TAG, "startCapture: capturing frames"); // For debugging
         try {
             CameraManager cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
             String cameraId = cameraManager.getCameraIdList()[0];
@@ -110,6 +112,7 @@ import java.util.concurrent.Executor;
 
 
     private void onImageAvailable(ImageReader reader) {
+        numFramesCaptured++; // Increment the counter for debugging
         Image image = reader.acquireNextImage();
         if (image != null) {
             Image.Plane[] planes = image.getPlanes();
@@ -130,6 +133,7 @@ import java.util.concurrent.Executor;
                 long timeStamp = image.getTimestamp();
                 Processing.processYuv420888(yuvData, image.getWidth(), image.getHeight(), timeStamp);
             }
+            Log.d(TAG, "onImageAvailable: captured frame " + numFramesCaptured); // for debugging
         }
         image.close();
     }
