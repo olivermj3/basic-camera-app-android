@@ -15,9 +15,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
+import android.util.Log;
 
 public class Processing {
-
+    private static final String TAG = "Processing";
     private Image image;
     private Gson gson;
 
@@ -51,6 +52,7 @@ public class Processing {
     }
 
     public static void processYuv420888(byte[] yuvData, int width, int height, long timeStamp) {
+        Log.d(TAG, "processing YUV data...");
         Image image = ImageUtils.yuv420888ToImage(yuvData, width, height, timeStamp);
         new Processing(image);
     }
@@ -115,8 +117,10 @@ public class Processing {
         try (FileOutputStream outputStream = new FileOutputStream(file)) {
             outputStream.write(jsonString.getBytes());
         } catch (IOException e) {
+            Log.e(TAG, "Error writing color values to file", e);
             e.printStackTrace();
         }
+        Log.d(TAG, "Color values saved to file");
     }
 
     private void printColorValues(HashMap<String, Integer> colorValues) {

@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
@@ -28,12 +29,22 @@ public class MainActivity extends Activity {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Permission not yet granted");
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
+                Log.d(TAG, "Permission granted");
             } else {
+                Log.d(TAG, "Permission  granted");
                 startCamera();
             }
         } else {
-            startCamera();
+            if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Permission not yet granted");
+                requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
+                Log.d(TAG, "Permission granted");
+            } else {
+                Log.d(TAG, "Permission granted");
+                startCamera();
+            }
         }
 
         Button cameraBtn = findViewById(R.id.cameraBtn);
@@ -41,13 +52,21 @@ public class MainActivity extends Activity {
         cameraBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                startCamera();
+                if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "Permission not yet granted");
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
+                    Log.d(TAG, "Permission granted");
+                } else {
+                    Log.d(TAG, "Permission granted");
+                    startCamera();
+                }
             }
         });
     }
 
     private void startCamera() {
         cameraCapture = new CameraCapture();
+        Log.d(TAG, "startCapture method called");
         cameraCapture.startCapture(this, executor);
 
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
