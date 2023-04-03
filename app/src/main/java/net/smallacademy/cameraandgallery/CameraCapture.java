@@ -96,6 +96,8 @@ public class CameraCapture {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+        previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
+        previewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
     }
 
     private void onImageAvailable(ImageReader reader) {
