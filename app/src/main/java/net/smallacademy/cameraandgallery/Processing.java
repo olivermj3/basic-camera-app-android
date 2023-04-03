@@ -43,18 +43,28 @@ public class Processing {
     static int[] rc_b = {280, 411, 427, 426, 423, 358, 371, 330};
     static int[][] all_rois = {left_eye, right_eye,mouth, left_fh_t, left_fh_b, center_fh_lt, center_fh_lb, center_fh_rt, center_fh_rb, right_fh_t, right_fh_b, center_fh_b, nose_top, nose_bot, lc_t, lc_b, rc_t, rc_b};
 
-    private Processing(@NonNull Image image) {
-        this.image = image;
+    private Processing(@NonNull byte[] yuvData, int width, int height, long timestamp) {
         this.gson = new Gson();
 
-        InputImage inputImage = InputImage.fromMediaImage(image, 0);
+        InputImage inputImage = InputImage.fromByteBuffer(
+                ByteBuffer.wrap(yuvData),
+                width,
+                height,
+                timestamp,
+                InputImage.IMAGE_FORMAT_YUV_420_888
+        );
         extractColorValues(inputImage);
     }
 
     public static void processYuv420888(byte[] yuvData, int width, int height, long timeStamp) {
         Log.d(TAG, "processing YUV data...");
-        Image image = ImageUtils.yuv420888ToImage(yuvData, width, height, timeStamp);
-        new Processing(image);
+
+        if (yuvData == null || yuvData.length == 0) {
+            Log.e(TAG, "Invalid YUV data provided for processing");
+            return;
+        }
+
+        new Processing(yuvData, width, height, timeStamp);
     }
 
     private void extractColorValues(InputImage inputImage) {

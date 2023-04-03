@@ -10,6 +10,7 @@ import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraDevice.StateCallback;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 
@@ -127,7 +128,14 @@ import java.util.concurrent.Executors;
                     @Override
                     public void onConfigured(@NonNull CameraCaptureSession session) {
                         try {
-                            CaptureRequest previewRequest = previewRequestBuilder.build();
+                            CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                            builder.addTarget(surface);
+                            builder.addTarget(imageReader.getSurface());
+                            builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                            builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
+                            builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
+
+                            CaptureRequest previewRequest = builder.build();
                             Log.e(TAG, "The camera CaptureRequest previewRequest was built");
                             cameraCaptureSession = session;
                             session.setRepeatingRequest(previewRequest, null, null);
@@ -142,6 +150,7 @@ import java.util.concurrent.Executors;
                         Log.e(TAG, "Failed to configure the camera");
                     }
                 };
+
         public void startCapture(Context context, Executor executor) {
             Log.d(TAG, "startCapture called with context = " + context + " and executor = " + executor);
 
@@ -155,9 +164,12 @@ import java.util.concurrent.Executors;
 
             Log.d(TAG, "Creating ImageReader with surface = " + surface + " and executor = " + executor);
             try {
+                Log.d(TAG, "Creating ImageReader");
                 imageReader = ImageReader.newInstance(/*width=*/ 640, /*height=*/ 480, /*format=*/ ImageFormat.YUV_420_888, /*maxImages=*/ MAX_IMAGES);
+                Log.d(TAG, "ImageReader created: " + imageReader);
                 Log.d(TAG, "ImageReader configuration: width = " + imageReader.getWidth() + ", height = " + imageReader.getHeight() + ", format = " + imageReader.getImageFormat() + ", maxImages = " + imageReader.getMaxImages());
                 imageReader.setOnImageAvailableListener(this::onImageAvailable, new Handler(Looper.getMainLooper()));
+                Log.d(TAG, "onImageAvailable listener set: " + this.getClass().getSimpleName() + "::onImageAvailable");
             } catch (Exception e) {
                 Log.e(TAG, "Failed to create ImageReader: " + e.getMessage(), e);
                 return;
@@ -246,35 +258,43 @@ import java.util.concurrent.Executors;
 
 
         private void onImageAvailable(ImageReader reader) {
+            Log.d(TAG, "onImageAvailable called with reader = " + reader);
             if (!canCaptureFrame) {
                 return;
             }
 
-            numFramesCaptured++; // Increment the counter for debugging
-            Log.d(TAG, "onImageAvailable called");
-            Image image = reader.acquireNextImage();
+            Image image = reader.acquireLatestImage();
             if (image != null) {
-                Image.Plane[] planes = image.getPlanes();
-                if (planes.length == 3) {
-                    // Get the YUV_420_888 data from the planes
-                    ByteBuffer yBuffer = planes[0].getBuffer();
-                    ByteBuffer uBuffer = planes[1].getBuffer();
-                    ByteBuffer vBuffer = planes[2].getBuffer();
-                    int ySize = yBuffer.remaining();
-                    int uSize = uBuffer.remaining();
-                    int vSize = vBuffer.remaining();
-                    byte[] yuvData = new byte[ySize + uSize + vSize];
-                    yBuffer.get(yuvData, 0, ySize);
-                    uBuffer.get(yuvData, ySize, uSize);
-                    vBuffer.get(yuvData, ySize + uSize, vSize);
+                try {
+                    numFramesCaptured++;
+                    Log.d(TAG, "Frame captured count: " + numFramesCaptured);
 
-                    // Extract timestamp from image
-                    long timeStamp = image.getTimestamp();
-                    Processing.processYuv420888(yuvData, image.getWidth(), image.getHeight(), timeStamp);
+                    Log.d(TAG, "Image acquired: size=" + image.getWidth() + "x" + image.getHeight() + ", format=" + image.getFormat() + ", timestamp=" + image.getTimestamp());
+
+                    Image.Plane[] planes = image.getPlanes();
+                    if (planes.length == 3) {
+                        // Get the YUV_420_888 data from the planes
+                        ByteBuffer yBuffer = planes[0].getBuffer();
+                        ByteBuffer uBuffer = planes[1].getBuffer();
+                        ByteBuffer vBuffer = planes[2].getBuffer();
+                        int ySize = yBuffer.remaining();
+                        int uSize = uBuffer.remaining();
+                        int vSize = vBuffer.remaining();
+                        byte[] yuvData = new byte[ySize + uSize + vSize];
+                        yBuffer.get(yuvData, 0, ySize);
+                        uBuffer.get(yuvData, ySize, uSize);
+                        vBuffer.get(yuvData, ySize + uSize, vSize);
+
+                        // Extract timestamp from image
+                        long timeStamp = image.getTimestamp();
+                        Processing.processYuv420888(yuvData, image.getWidth(), image.getHeight(), timeStamp); // Updated call
+                    }
+
+                    Log.d(TAG, "Frame captured and processed: " + numFramesCaptured);
+                } finally {
+                    image.close();
                 }
-                Log.d(TAG, "onImageAvailable: captured frame " + numFramesCaptured); // for debugging
             }
-            image.close();
 
             // Set a delay before the next frame can be captured
             canCaptureFrame = false;
@@ -282,7 +302,10 @@ import java.util.concurrent.Executors;
         }
 
 
-    public void stopCapture() {
+
+
+
+        public void stopCapture() {
         if (cameraDevice != null) {
             try {
                 if (cameraCaptureSession != null) {
