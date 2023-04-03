@@ -50,7 +50,6 @@ public class CameraCapture {
     private boolean capturing;
     private CameraCaptureSession cameraCaptureSession;
     private CaptureRequest.Builder previewRequestBuilder;
-    private Processing processing;
 
     private final CameraCaptureSession.StateCallback captureSessionStateCallback =
             new CameraCaptureSession.StateCallback() {
@@ -175,8 +174,6 @@ public class CameraCapture {
                 ByteBuffer yBuffer = planes[0].getBuffer();
                 ByteBuffer uBuffer = planes[1].getBuffer();
                 ByteBuffer vBuffer = planes[2].getBuffer();
-                processing = new Processing();
-                processing.processImage(yBuffer, uBuffer, vBuffer); // call processing method
             }
             image.close();
         }
