@@ -30,6 +30,13 @@ android {
         implementation 'com.google.mediapipe:solution-core:latest.release'
         implementation 'com.google.mediapipe:facemesh:latest.release'
 
+        // MLKit Dependencies
+        implementation 'com.google.mlkit:vision-common:latest.release'
+        implementation 'com.google.mlkit:face-detection:latest.release'
+
+        // JSON Dump dependencies
+        implementation 'com.google.code.gson:gson:latest.release'
+
         // CameraX
         def camerax_version = "latest.release"
         implementation "androidx.camera:camera-core:$camerax_version"

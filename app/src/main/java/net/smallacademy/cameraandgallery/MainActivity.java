@@ -12,7 +12,7 @@ import android.widget.Button;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-// test comment
+
 public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
@@ -24,10 +24,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Set the activity layout
         setContentView(R.layout.activity_main);
 
-        // Check for camera permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
@@ -38,31 +36,26 @@ public class MainActivity extends Activity {
             startCamera();
         }
 
-        // Find the camera button in the layout
         Button cameraBtn = findViewById(R.id.cameraBtn);
 
-        // Set a click listener for the camera button
         cameraBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Call the startCamera() method when the camera button is pressed
                 startCamera();
             }
         });
     }
 
     private void startCamera() {
-        // Create a new instance of CameraCapture and start capturing images
         cameraCapture = new CameraCapture();
         cameraCapture.startCapture(this, executor);
 
-        // Schedule to stop capturing images after 3 seconds using a Handler
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
                 cameraCapture.stopCapture();
             }
-        }, 3000); // this is the 3 second variable
+        }, 3000);
     }
 
     @Override
