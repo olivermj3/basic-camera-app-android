@@ -21,45 +21,39 @@ public class MainActivity extends Activity {
     private Executor executor = Executors.newSingleThreadExecutor();
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 100;
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        setContentView(R.layout.activity_main);
-
+    private void checkAndRequestCameraPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 Log.d(TAG, "Permission not yet granted");
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
-                Log.d(TAG, "Permission granted");
             } else {
-                Log.d(TAG, "Permission  granted");
+                Log.d(TAG, "Permission granted");
                 startCamera();
             }
         } else {
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 Log.d(TAG, "Permission not yet granted");
                 requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
-                Log.d(TAG, "Permission granted");
             } else {
                 Log.d(TAG, "Permission granted");
                 startCamera();
             }
         }
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main); // Make sure you have the correct layout file here
+
+        checkAndRequestCameraPermission();
 
         Button cameraBtn = findViewById(R.id.cameraBtn);
 
         cameraBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    Log.d(TAG, "Permission not yet granted");
-                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST_CODE);
-                    Log.d(TAG, "Permission granted");
-                } else {
-                    Log.d(TAG, "Permission granted");
-                    startCamera();
-                }
+                checkAndRequestCameraPermission();
             }
         });
     }
@@ -81,11 +75,12 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
                 // Handle denied camera permission
             }
         }
     }
+
 }
