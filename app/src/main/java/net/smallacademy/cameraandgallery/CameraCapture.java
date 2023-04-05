@@ -44,12 +44,12 @@ public class CameraCapture {
     private boolean canCaptureFrame = true;
     private int numFramesCaptured = 0;
 
-    private int numProcessingThreads = 6;
+    private int numProcessingThreads = 12;
 
 
     private static final int MAX_IMAGES = 30;
     private static final int MAX_IMAGES_PER_SECOND = 30;
-    private static final int CAPTURE_INTERVAL_MS = 100; // 100 ms between each frame for 10 FPS
+    private static final int CAPTURE_INTERVAL_MS = 50; // 100 ms between each frame for 10 FPS
     private static final int CAPTURE_DURATION_SECONDS = 30;
 
     private final Handler captureDelayHandler = new Handler(Looper.getMainLooper());
@@ -114,7 +114,7 @@ public class CameraCapture {
         CameraManager cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
             String[] cameraIdList = cameraManager.getCameraIdList();
-            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraIdList[0]);
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraIdList[1]); // 1 is the front facing camera; 0 is the back camera
             Range<Integer>[] fpsRanges = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
             Range<Integer> bestRange = null;
             int maxUpperBound = 0;
@@ -141,8 +141,11 @@ public class CameraCapture {
                         builder.addTarget(surface);
                         builder.addTarget(imageReader.getSurface());
                         builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
-                        builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON);
-                        builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
+                        // Lock auto-exposure and auto-white balance
+                        builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF);
+                        builder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
+                        builder.set(CaptureRequest.CONTROL_AE_LOCK, true);
+                        builder.set(CaptureRequest.CONTROL_AWB_LOCK, true);
                         builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, getBestFpsRange());
                         // Logging statements to confirm that the builder parameters have been set
                         Log.d(TAG, "Preview capture request builder parameters set:");
@@ -155,6 +158,7 @@ public class CameraCapture {
                         CaptureRequest previewRequest = builder.build();
                         cameraCaptureSession = session;
                         session.setRepeatingRequest(previewRequest, null, null);
+                        Log.d(TAG, "Camera capture session successfully configured");
                     } catch (CameraAccessException e) {
                         Log.e(TAG, "Error setting up preview", e);
                     }
@@ -231,6 +235,7 @@ public class CameraCapture {
                                 previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
                                 cameraCaptureSession.capture(previewRequestBuilder.build(), null, backgroundHandler);
                                 previewRequestBuilder.removeTarget(imageReader.getSurface());
+
                             } else {
                                 Log.e(TAG, "CameraCaptureSession is null, cannot capture frame " + numFramesCaptured);
                             }
