@@ -24,6 +24,7 @@ import android.view.Surface;
 import android.graphics.SurfaceTexture;
 import androidx.annotation.NonNull;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,10 +44,7 @@ public class CameraCapture {
     private Executor cameraExecutor;
     private boolean canCaptureFrame = true;
     private int numFramesCaptured = 0;
-
     private int numProcessingThreads = 12;
-
-
     private static final int MAX_IMAGES = 30;
     private static final int MAX_IMAGES_PER_SECOND = 30;
     private static final int CAPTURE_INTERVAL_MS = 50; // 100 ms between each frame for 10 FPS
@@ -66,7 +64,7 @@ public class CameraCapture {
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
             cameraDevice = camera;
-            Log.d(TAG, "Opening camera");
+            Log.d(TAG, "Opening camera with device: " + cameraDevice.getId());
             try {
                 Log.d(TAG, "Creating preview request builder with surface = " + surface);
                 previewRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
@@ -83,7 +81,7 @@ public class CameraCapture {
                     }
                 });
                 // Add a logging statement to indicate that the camera has successfully opened
-                Log.d(TAG, "Camera has successfully opened");
+                Log.d(TAG, "Camera has successfully opened with device: " + cameraDevice.getId());
             } catch (CameraAccessException e) {
                 // Add a more descriptive error message to indicate what went wrong
                 Log.e(TAG, "Error setting up camera preview - CameraAccessException: " + e.getMessage(), e);
@@ -136,6 +134,7 @@ public class CameraCapture {
             new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    cameraCaptureSession = session;
                     try {
                         CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
                         builder.addTarget(surface);
@@ -215,8 +214,6 @@ public class CameraCapture {
             Log.e(TAG, "Failed to create ImageReader: " + e.getMessage(), e);
             return;
         }
-
-
         Log.d(TAG, "startCapture: capturing frames for " + CAPTURE_DURATION_SECONDS + " seconds");
 
         // start capturing frames at specified interval
@@ -227,17 +224,42 @@ public class CameraCapture {
                     if (canCaptureFrame) {
                         canCaptureFrame = false;
                         numFramesCaptured++;
-                        Log.d(TAG, "Capturing frame " + numFramesCaptured);
+                        Log.d(TAG, "Capturing frame " + numFramesCaptured); // it is not getting past here
                         try {
                             if (cameraCaptureSession != null) {
+                                Log.d(TAG, "Try to addTarget");
                                 previewRequestBuilder.addTarget(imageReader.getSurface());
+                                Log.d(TAG, "Try to set AF_TRIGGER");
                                 previewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START);
+                                Log.d(TAG, "Try to set AE_MODE");
                                 previewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+                                Log.d(TAG, "Try cameraCaptureSession.capture");
                                 cameraCaptureSession.capture(previewRequestBuilder.build(), null, backgroundHandler);
+                                Log.d(TAG, "Try to removeTarget");
                                 previewRequestBuilder.removeTarget(imageReader.getSurface());
+                                Log.d(TAG, "Capture request sent to cameraCaptureSession.");
+                            } else if (cameraDevice != null) { // Check if cameraDevice is not null before creating a new CameraCaptureSession
+                                Log.d(TAG, "CameraCaptureSession is null, creating a new one.");
+                                List<Surface> outputSurfaces = Arrays.asList(imageReader.getSurface());
+                                cameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
+                                    @Override
+                                    public void onConfigured(@NonNull CameraCaptureSession session) {
+                                        cameraCaptureSession = session;
+                                        try {
+                                            session.setRepeatingRequest(previewRequestBuilder.build(), null, backgroundHandler);
+                                            Log.d(TAG, "Capture session created and repeating request set.");
+                                        } catch (CameraAccessException e) {
+                                            Log.e(TAG, "Error setting up repeating request", e);
+                                        }
+                                    }
 
+                                    @Override
+                                    public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                                        Log.e(TAG, "Failed to configure CameraCaptureSession");
+                                    }
+                                }, backgroundHandler);
                             } else {
-                                Log.e(TAG, "CameraCaptureSession is null, cannot capture frame " + numFramesCaptured);
+                                Log.e(TAG, "Both cameraCaptureSession and cameraDevice are null. Cannot capture frame.");
                             }
                         } catch (CameraAccessException e) {
                             Log.e(TAG, "Error capturing frame " + numFramesCaptured, e);
@@ -245,13 +267,13 @@ public class CameraCapture {
                     }
                     captureDelayHandler.postDelayed(captureDelayRunnable, CAPTURE_INTERVAL_MS);
                     startCapture(context, executor);
+
                 } else {
                     Log.d(TAG, "Max number of frames captured");
                     stopCapture();
                 }
             }
         }, CAPTURE_INTERVAL_MS);
-
 
         // Stop capturing images after the desired duration
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
